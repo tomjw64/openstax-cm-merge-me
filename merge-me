@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+
+function exit_with_err_msg() {
+  echo >&2 -e "\\033[41m\\033[1mError\\033[0m $*"
+  exit 1
+}
+
+function debug_msg() {
+  [[ "$DEBUG" = true ]] && echo >&2 -e "\\033[42m\\033[1mDebug\\033[0m $*"
+}
+
+function info_msg() {
+  echo >&2 -e "\\033[44m\\033[1mInfo\\033[0m $*"
+}
+
+function cmd_exists_or_fail() {
+  debug_msg "Checking for command: $1"
+  command -v "$1" >/dev/null 2>&1 || exit_with_err_msg "Could not find command: $1"
+}
+
+function dir_exists_or_fail() {
+  debug_msg "Checking for directory: $1"
+  [[ -d "$1" ]] || exit_with_err_msg "Could not find directory: $1"
+}
+
+function dir_not_exists_or_fail() {
+  debug_msg "Checking for directory: $1"
+  [[ -d "$1" ]] && exit_with_err_msg "Directory already exists: $1"
+}
+
+function clean_up() {
+  debug_msg "Cleaning up"
+  rm -rf "$tmp" || exit_with_err_msg "Could not remove directory: $tmp"
+  cd "$initial_wd" || exit_with_err_msg "Could not navigate to initial pwd"
+}
+trap "clean_up" EXIT
+
+function extract_info_from_col_path() {
+  local col_dir_path col_dir_basename col_legacy_id col_version
+
+  col_dir_path=$1
+  col_dir_basename=$(basename "$1")
+  col_legacy_id=${col_dir_basename%%_*}
+  col_version=${col_dir_basename##*_}
+
+  debug_msg "Got basename $col_dir_basename from $col_dir_path"
+  debug_msg "Detected collection legacy id: $col_legacy_id"
+  debug_msg "Detected collection version: $col_version"
+
+  echo "$col_legacy_id" "$col_version"
+}
+
+function make_temp() {
+  debug_msg "Making temp directory: $tmp"
+  mkdir "$tmp" || exit_with_err_msg "Could not create directory: $tmp"
+}
+
+function populate_temp() {
+  debug_msg "Populating temp directory"
+  local col_info col_legacy_id col_version
+
+  col_info=$(extract_info_from_col_path "$col_path")
+  read -r col_legacy_id col_version <<< "$col_info"
+
+  debug_msg "Copying collection with user changes into temp"
+  cp -r "$col_path" "${tmp}/mine"
+
+  debug_msg "Fetching latest into temp"
+  neb get "$neb_env" "$( [[ "$HUMAN" = true ]] && echo "-t" )" "$col_legacy_id" latest -d "${tmp}/theirs"
+
+  debug_msg "Fetching parent version into temp"
+  neb get "$neb_env" "$( [[ "$HUMAN" = true ]] && echo "-t" )" "$col_legacy_id" "$col_version" -d "${tmp}/parent" <<< "y"
+}
+
+function merge() {
+  cd "$tmp" || exit_with_err_msg "Could not navigate to temp directory"
+
+  cd parent || exit_with_err_msg "Navigation error: $(pwd)/parent"
+
+  debug_msg "Initializing git in parent"
+  git init
+  git add .
+  git commit -m "parent"
+  git checkout -b mine
+  git checkout -b theirs
+
+  debug_msg "Resolving head changes"
+  rm -rf ./*
+  cp -r ../theirs/* .
+  git add :/
+  git commit -m "theirs"
+  git checkout mine
+
+  debug_msg "Resolving local changes"
+  rm -rf ./*
+  cp -r ../mine/* .
+  git add :/
+  git commit -m "mine"
+
+  debug_msg "Merging"
+  git rebase --strategy-option=ours theirs
+
+  cd "$initial_wd" || exit_with_err_msg "Could not navigate to initial pwd"
+}
+
+function copy_merge_to_out() {
+  debug_msg "Copying merged directory as desired output directory"
+  cp -r "${tmp}/parent" "$out_dir"
+}
+
+col_path=$1
+neb_env=$2
+out_dir=$3
+initial_wd=$(pwd)
+tmp="${initial_wd}/.merge-me-tmp"
+
+cmd_exists_or_fail neb
+cmd_exists_or_fail git
+dir_exists_or_fail "$col_path"
+dir_not_exists_or_fail "$out_dir"
+
+make_temp
+populate_temp
+merge
+copy_merge_to_out
+debug_msg "Done"
