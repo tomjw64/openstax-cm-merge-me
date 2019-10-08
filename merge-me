@@ -104,30 +104,30 @@ function merge() {
   cd parent || exit_with_err_msg "Navigation error: $(pwd)/parent"
 
   info_msg "Initializing git in parent"
-  git init |& debug_msg
-  git add . |& debug_msg
-  git commit -m "parent" |& debug_msg
-  git checkout -b mine |& debug_msg
-  git checkout -b theirs |& debug_msg
+  git init 2>&1 | debug_msg
+  git add . 2>&1 | debug_msg
+  git commit -m "parent" 2>&1 | debug_msg
+  git checkout -b mine 2>&1 | debug_msg
+  git checkout -b theirs 2>&1 | debug_msg
 
   info_msg "Resolving head changes"
-  rm -rf ./* |& debug_msg
-  cp -r ../theirs/* . |& debug_msg
-  git add :/ |& debug_msg
-  git commit -m "theirs" |& debug_msg
-  git checkout mine |& debug_msg
+  rm -rf ./* 2>&1 | debug_msg
+  cp -r ../theirs/* . 2>&1 | debug_msg
+  git add :/ 2>&1 | debug_msg
+  git commit -m "theirs" 2>&1 | debug_msg
+  git checkout mine 2>&1 | debug_msg
 
   info_msg "Resolving local changes"
-  rm -rf ./* |& debug_msg
-  cp -r ../mine/* . |& debug_msg
-  git add :/ |& debug_msg
-  git commit -m "mine" |& debug_msg
+  rm -rf ./* 2>&1 | debug_msg
+  cp -r ../mine/* . 2>&1 | debug_msg
+  git add :/ 2>&1 | debug_msg
+  git commit -m "mine" 2>&1 | debug_msg
 
   info_msg "Merging"
   git rebase --strategy-option=ours theirs 2>/dev/null
 
   debug_msg "Trying to force the rebase through. A failure is ok"
-  git rebase --continue |& debug_msg
+  git rebase --continue 2>&1 | debug_msg
 
   cd "$initial_wd" || exit_with_err_msg "Could not navigate to initial pwd"
 }
