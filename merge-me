@@ -1,16 +1,42 @@
 #!/usr/bin/env bash
 
 function exit_with_err_msg() {
-  echo >&2 -e "\\033[41m\\033[1mError\\033[0m $*"
+  echo >&2 -e "\\033[41m\\033[1mError\\033[0m $1"
   exit 1
 }
 
 function debug_msg() {
-  [[ "$DEBUG" = true ]] && echo >&2 -e "\\033[42m\\033[1mDebug\\033[0m $*"
+  if [[ "$DEBUG" = true ]]; then
+    if [ -t 0 ]; then
+      if [ $# -gt 0 ]; then
+        echo >&2 -ne "\\033[42m\\033[1mDebug\\033[0m "
+        echo >&2 "$*"
+      fi
+    else
+      local input
+      read -r input
+      if [[ -n "$input" ]]; then
+        echo >&2 -ne "\\033[42m\\033[1mDebug\\033[0m "
+        echo >&2 "$input"
+      fi
+    fi
+  fi
 }
 
 function info_msg() {
-  echo >&2 -e "\\033[44m\\033[1mInfo\\033[0m $*"
+  if [ -t 0 ]; then
+    if [ $# -gt 0 ]; then
+      echo >&2 -ne "\\033[44m\\033[1mInfo\\033[0m "
+      echo >&2 "$*"
+    fi
+  else
+    local input
+    read -r input
+    if [[ -n "$input" ]]; then
+      echo >&2 -ne "\\033[44m\\033[1mInfo\\033[0m "
+      echo >&2 "$input"
+    fi
+  fi
 }
 
 function cmd_exists_or_fail() {
@@ -51,7 +77,7 @@ function extract_info_from_col_path() {
 }
 
 function make_temp() {
-  debug_msg "Making temp directory: $tmp"
+  info_msg "Making temp directory: $tmp"
   mkdir "$tmp" || exit_with_err_msg "Could not create directory: $tmp"
 }
 
@@ -59,17 +85,17 @@ function populate_temp() {
   debug_msg "Populating temp directory"
   local col_info col_legacy_id col_version
 
-  col_info=$(extract_info_from_col_path "$col_path")
+  col_info="$(extract_info_from_col_path "$col_path")"
   read -r col_legacy_id col_version <<< "$col_info"
 
-  debug_msg "Copying collection with user changes into temp"
+  info_msg "Copying collection with user changes into temp"
   cp -r "$col_path" "${tmp}/mine"
 
-  debug_msg "Fetching latest into temp"
-  neb get "$neb_env" "$( [[ "$HUMAN" = true ]] && echo "-t" )" "$col_legacy_id" latest -d "${tmp}/theirs"
+  info_msg "Fetching latest into temp"
+  neb get "$neb_env" "$( [[ "$HUMAN" = true ]] && echo "-t" )" "$col_legacy_id" latest -d "${tmp}/theirs" || exit_with_err_msg "Fetch failed."
 
-  debug_msg "Fetching parent version into temp"
-  neb get "$neb_env" "$( [[ "$HUMAN" = true ]] && echo "-t" )" "$col_legacy_id" "$col_version" -d "${tmp}/parent" <<< "y"
+  info_msg "Fetching parent version into temp"
+  neb get "$neb_env" "$( [[ "$HUMAN" = true ]] && echo "-t" )" "$col_legacy_id" "$col_version" -d "${tmp}/parent" <<< "y" || exit_with_err_msg "Fetch failed."
 }
 
 function merge() {
@@ -77,28 +103,31 @@ function merge() {
 
   cd parent || exit_with_err_msg "Navigation error: $(pwd)/parent"
 
-  debug_msg "Initializing git in parent"
-  git init
-  git add .
-  git commit -m "parent"
-  git checkout -b mine
-  git checkout -b theirs
+  info_msg "Initializing git in parent"
+  git init |& debug_msg
+  git add . |& debug_msg
+  git commit -m "parent" |& debug_msg
+  git checkout -b mine |& debug_msg
+  git checkout -b theirs |& debug_msg
 
-  debug_msg "Resolving head changes"
-  rm -rf ./*
-  cp -r ../theirs/* .
-  git add :/
-  git commit -m "theirs"
-  git checkout mine
+  info_msg "Resolving head changes"
+  rm -rf ./* |& debug_msg
+  cp -r ../theirs/* . |& debug_msg
+  git add :/ |& debug_msg
+  git commit -m "theirs" |& debug_msg
+  git checkout mine |& debug_msg
 
-  debug_msg "Resolving local changes"
-  rm -rf ./*
-  cp -r ../mine/* .
-  git add :/
-  git commit -m "mine"
+  info_msg "Resolving local changes"
+  rm -rf ./* |& debug_msg
+  cp -r ../mine/* . |& debug_msg
+  git add :/ |& debug_msg
+  git commit -m "mine" |& debug_msg
 
-  debug_msg "Merging"
-  git rebase --strategy-option=ours theirs
+  info_msg "Merging"
+  git rebase --strategy-option=ours theirs 2>/dev/null
+
+  debug_msg "Trying to force the rebase through. A failure is ok"
+  git rebase --continue |& debug_msg
 
   cd "$initial_wd" || exit_with_err_msg "Could not navigate to initial pwd"
 }
@@ -114,6 +143,8 @@ out_dir=$3
 initial_wd=$(pwd)
 tmp="${initial_wd}/.merge-me-tmp"
 
+[[ "$DEBUG" = true ]] && export DEBUG=true
+
 cmd_exists_or_fail neb
 cmd_exists_or_fail git
 dir_exists_or_fail "$col_path"
@@ -123,4 +154,4 @@ make_temp
 populate_temp
 merge
 copy_merge_to_out
-debug_msg "Done"
+info_msg "Done - Output in directory: $out_dir"
