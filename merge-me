@@ -83,7 +83,7 @@ function make_temp() {
 
 function populate_temp() {
   debug_msg "Populating temp directory"
-  local col_info col_legacy_id col_version
+  local params params_common col_info col_legacy_id col_version
 
   col_info="$(extract_info_from_col_path "$col_path")"
   read -r col_legacy_id col_version <<< "$col_info"
@@ -91,11 +91,15 @@ function populate_temp() {
   info_msg "Copying collection with user changes into temp"
   cp -r "$col_path" "${tmp}/mine"
 
+  [[ "$HUMAN" = true ]] && params=("-t")
+  params_common=("$neb_env" "$col_legacy_id")
+  params=(${params[@]} ${params_common[@]})
+
   info_msg "Fetching latest into temp"
-  neb get "$neb_env" "$col_legacy_id" latest -d "${tmp}/theirs" "$( [[ "$HUMAN" = true ]] && echo "-t" )" || exit_with_err_msg "Fetch failed."
+  neb get ${params[@]} latest -d "${tmp}/theirs" || exit_with_err_msg "Fetch failed."
 
   info_msg "Fetching parent version into temp"
-  neb get "$neb_env" "$col_legacy_id" "$col_version" -d "${tmp}/parent" "$( [[ "$HUMAN" = true ]] && echo "-t" )" <<< "y" || exit_with_err_msg "Fetch failed."
+  neb get ${params[@]} "$col_version" -d "${tmp}/parent" <<< "y" || exit_with_err_msg "Fetch failed."
 }
 
 function merge() {
