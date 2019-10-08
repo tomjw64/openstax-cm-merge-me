@@ -92,10 +92,10 @@ function populate_temp() {
   cp -r "$col_path" "${tmp}/mine"
 
   info_msg "Fetching latest into temp"
-  neb get -d "${tmp}/theirs" "$neb_env" "$( [[ "$HUMAN" = true ]] && echo "-t" )" "$col_legacy_id" latest || exit_with_err_msg "Fetch failed."
+  neb get "$neb_env" "$col_legacy_id" latest -d "${tmp}/theirs" "$( [[ "$HUMAN" = true ]] && echo "-t" )" || exit_with_err_msg "Fetch failed."
 
   info_msg "Fetching parent version into temp"
-  neb get -d "${tmp}/parent" "$neb_env" "$( [[ "$HUMAN" = true ]] && echo "-t" )" "$col_legacy_id" "$col_version" <<< "y" || exit_with_err_msg "Fetch failed."
+  neb get "$neb_env" "$col_legacy_id" "$col_version" -d "${tmp}/parent" "$( [[ "$HUMAN" = true ]] && echo "-t" )" <<< "y" || exit_with_err_msg "Fetch failed."
 }
 
 function merge() {
