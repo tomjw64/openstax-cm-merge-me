@@ -15,4 +15,4 @@ To update: go to the cloned directory and `git fetch && git pull`
 
 You can be in any directory you want, and merge-me will work in a temp directory inside the current working directory, which will be cleaned up for you when the merge is complete.
 
-To view the diff that `merge-me` found (via git) change directories to `out_directory` and compare the `mine` branch with the `theirs` branch. This can be done with `git diff theirs`. Please review this diff before ever publishing your changes.
+To view the diff that `merge-me` found (via git) change directories to `out_directory` and compare the `mine` branch with the `theirs` branch. This can be done with `cd <path/to/out_directory> && git diff theirs`. Please review this diff before ever publishing your changes.
