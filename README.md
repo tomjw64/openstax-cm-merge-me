@@ -1,6 +1,7 @@
 # merge-me
 
 Tool for CMs to automatically merge stale content work with neb.
+(This repo is archived, the most recent version of this tool is in a private openstax repo)
 
 ## Dependencies
 - git
